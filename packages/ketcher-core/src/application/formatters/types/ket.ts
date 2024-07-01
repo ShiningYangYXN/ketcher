@@ -18,11 +18,19 @@ export interface IKetGroupNode {
 
 export type KetNode = IKetMonomerNode | IKetGroupNode;
 
-export interface IKetConnectionEndPoint {
-  monomerId?: string;
+export interface IKetConnectionMonomerEndPoint {
+  monomerId: string;
   attachmentPointId?: string;
   groupId?: string;
 }
+
+export interface IKetConnectionMoleculeEndPoint {
+  moleculeId: string;
+  atomId: string;
+}
+
+export type IKetConnectionEndPoint = IKetConnectionMonomerEndPoint &
+  IKetConnectionMoleculeEndPoint;
 
 export enum KetConnectionType {
   SINGLE = 'single',
@@ -64,6 +72,8 @@ export enum KetMonomerClass {
   Linker = 'Linker',
   Unknown = 'Unknown',
   CHEM = 'CHEM',
+  RNA = 'RNA',
+  DNA = 'DNA',
 }
 export type IKetAttachmentPointType = 'left' | 'right' | 'side';
 
@@ -114,6 +124,7 @@ export interface IKetMonomerTemplate {
   classHELM?: string;
   name?: string;
   idtAliases?: IKetIdtAliases;
+  unresolved?: boolean;
 }
 
 export interface IKetMonomerTemplateRef {

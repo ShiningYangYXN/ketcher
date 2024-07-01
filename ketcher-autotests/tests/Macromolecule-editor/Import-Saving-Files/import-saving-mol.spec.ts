@@ -21,6 +21,7 @@ import {
   selectSnakeLayoutModeTool,
   turnOnMicromoleculesEditor,
   selectClearCanvasTool,
+  delay,
 } from '@utils';
 import {
   chooseFileFormat,
@@ -222,11 +223,13 @@ test.describe('Import-Saving .mol Files', () => {
     expect(molFile).toEqual(molFileExpected);
 
     const numberOfPressZoomOut = 6;
+    await page.getByTestId('zoom-selector').click();
     for (let i = 0; i < numberOfPressZoomOut; i++) {
       await waitForRender(page, async () => {
         await page.getByTestId('zoom-out-button').click();
       });
     }
+    await clickInTheMiddleOfTheScreen(page);
     await takeEditorScreenshot(page);
   });
 
@@ -332,6 +335,8 @@ test.describe('Import-Saving .mol Files', () => {
     await openFile(filename, page);
     await selectOptionInDropdown(filename, page);
     await pressButton(page, 'Add to Canvas');
+    // Experimental delay - must be removed after waitForSpinnerFinishedWork refactor
+    await delay(2);
     await takeEditorScreenshot(page);
 
     // Closing page since test expects it to have closed at the end
@@ -489,11 +494,13 @@ test.describe('Import modified .mol files from external editor', () => {
       test(`for ${fileName}`, async () => {
         await openFileAndAddToCanvasMacro(`Molfiles-V3000/${fileName}`, page);
         const numberOfPressZoomOut = 4;
+        await page.getByTestId('zoom-selector').click();
         for (let i = 0; i < numberOfPressZoomOut; i++) {
           await waitForRender(page, async () => {
             await page.getByTestId('zoom-out-button').click();
           });
         }
+        await clickInTheMiddleOfTheScreen(page);
       });
     }
   }

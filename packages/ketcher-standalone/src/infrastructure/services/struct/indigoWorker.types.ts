@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ***************************************************************************/
+import { IKetMacromoleculesContent } from 'ketcher-core';
 
 // TODO add typings for Indigo standalone object
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -66,6 +67,7 @@ export enum SupportedFormat {
   FASTA = 'fasta',
   SEQUENCE = 'sequence',
   IDT = 'idt',
+  HELM = 'helm',
 }
 
 export interface WithStruct {
@@ -81,7 +83,12 @@ export interface WithSelection {
 }
 
 export interface CommandOptions {
-  [key: string]: string | number | boolean | undefined;
+  [key: string]:
+    | IKetMacromoleculesContent
+    | string
+    | number
+    | boolean
+    | undefined;
 }
 
 export interface CommandData {

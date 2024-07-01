@@ -1,7 +1,11 @@
 import { Command } from 'domain/entities/Command';
 import { SelectLayoutModeOperation } from '../operations/polymerBond';
 import { CoreEditor, EditorHistory } from '../internal';
-import { LayoutMode, modesMap } from 'application/editor/modes';
+import {
+  DEFAULT_LAYOUT_MODE,
+  LayoutMode,
+  modesMap,
+} from 'application/editor/modes';
 import {
   getStructStringFromClipboardData,
   initHotKeys,
@@ -27,24 +31,24 @@ export abstract class BaseMode {
 
   protected constructor(
     public modeName: LayoutMode,
-    public previousMode: LayoutMode = 'flex-layout-mode',
+    public previousMode: LayoutMode = DEFAULT_LAYOUT_MODE,
   ) {}
 
-  private changeMode(editor: CoreEditor, modeName: LayoutMode) {
+  private changeMode(editor: CoreEditor, modeName: LayoutMode, isUndo = false) {
     editor.events.layoutModeChange.dispatch(modeName);
     const ModeConstructor = modesMap[modeName];
     editor.setMode(new ModeConstructor());
-    editor.mode.initialize();
+    editor.mode.initialize(true, isUndo);
   }
 
-  public initialize(needRemoveSelection = true) {
+  public initialize(needRemoveSelection = true, _isUndo = false) {
     const command = new Command();
     const editor = CoreEditor.provideEditorInstance();
 
     command.addOperation(
       new SelectLayoutModeOperation(
         this.changeMode.bind(this, editor, this.modeName),
-        this.changeMode.bind(this, editor, this.previousMode),
+        this.changeMode.bind(this, editor, this.previousMode, true),
         this.modeName,
         this.previousMode,
       ),
@@ -86,6 +90,10 @@ export abstract class BaseMode {
     drawingEntitiesManager: DrawingEntitiesManager,
   ): boolean;
 
+  abstract isPasteAvailable(
+    drawingEntitiesManager: DrawingEntitiesManager,
+  ): boolean;
+
   abstract scrollForView(): void;
 
   onCopy(event: ClipboardEvent) {
@@ -123,16 +131,15 @@ export abstract class BaseMode {
       }
     });
     const ketSerializer = new KetSerializer();
-    const { serializedMacromolecules } = ketSerializer.serializeMacromolecules(
+    const serializedKet = ketSerializer.serialize(
       new Struct(),
       drawingEntitiesManager,
     );
-    const clipboardItemString = JSON.stringify(serializedMacromolecules);
     if (isClipboardAPIAvailable()) {
-      navigator.clipboard.writeText(clipboardItemString);
+      navigator.clipboard.writeText(serializedKet);
     } else {
       legacyCopy(event.clipboardData, {
-        'text/plain': clipboardItemString,
+        'text/plain': serializedKet,
       });
       event.preventDefault();
     }
@@ -191,15 +198,11 @@ export abstract class BaseMode {
           break;
       }
 
-      if (inputFormat) {
-        modelChanges = await this.pasteWithIndigoConversion(
-          pastedStr,
-          inputFormat,
-          isSequenceOrFasta,
-        );
-      } else {
-        editor.events.error.dispatch('Pasted format could not be recognized.');
-      }
+      modelChanges = await this.pasteWithIndigoConversion(
+        pastedStr,
+        inputFormat,
+        isSequenceOrFasta,
+      );
     }
 
     if (!modelChanges || modelChanges.operations.length === 0) {
@@ -219,12 +222,22 @@ export abstract class BaseMode {
       throw new Error('Error during parsing file');
     }
     const drawingEntitiesManager = deserialisedKet?.drawingEntitiesManager;
+
     if (
       !drawingEntitiesManager ||
       !this.isPasteAllowedByMode(drawingEntitiesManager)
     ) {
       return;
     }
+    if (!this.isPasteAvailable(drawingEntitiesManager)) {
+      editor.events.openErrorModal.dispatch({
+        errorTitle: 'Error Message',
+        errorMessage:
+          'It is impossible to merge fragments. Attachment point to establish bonds are not available.',
+      });
+      return;
+    }
+
     this.updateMonomersPosition(drawingEntitiesManager);
     const { command: modelChanges, mergedDrawingEntities } =
       drawingEntitiesManager.mergeInto(editor.drawingEntitiesManager);
@@ -279,7 +292,7 @@ export abstract class BaseMode {
           ? new Vec2(monomer.position).add(offset)
           : new Vec2(monomer.position);
       }
-      monomer.moveAbsolute(position);
+      drawingEntitiesManager.moveMonomer(monomer, position);
       index++;
     });
   }

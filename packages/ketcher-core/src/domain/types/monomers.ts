@@ -34,9 +34,11 @@ export type MonomerItemType = {
     MonomerCaps?: { [key: string]: string };
     MonomerCode?: string;
     MonomerType?: string;
+    // TODO: Specify the type. `readonly MonomerClass: KetMonomerClass`?
     MonomerClass?: string;
     isMicromoleculeFragment?: boolean;
     idtAliases?: IKetIdtAliases;
+    unresolved?: boolean;
   };
   attachmentPoints?: IKetAttachmentPoint[];
   seqId?: number;

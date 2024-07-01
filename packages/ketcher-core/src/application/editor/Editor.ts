@@ -28,12 +28,7 @@ import { MacromoleculesConverter } from 'application/editor/MacromoleculesConver
 import { BaseMonomer } from 'domain/entities/BaseMonomer';
 import { ketcherProvider } from 'application/utils';
 import { initHotKeys, keyNorm } from 'utilities';
-import {
-  FlexMode,
-  LayoutMode,
-  modesMap,
-  SequenceMode,
-} from 'application/editor/modes/';
+import { LayoutMode, modesMap, SequenceMode } from 'application/editor/modes/';
 import { BaseMode } from 'application/editor/modes/internal';
 import assert from 'assert';
 import { BaseSequenceItemRenderer } from 'application/render/renderers/sequence/BaseSequenceItemRenderer';
@@ -50,6 +45,7 @@ import monomersDataRaw from './data/monomers.ket';
 interface ICoreEditorConstructorParams {
   theme;
   canvas: SVGSVGElement;
+  mode?: BaseMode;
 }
 
 function isMouseMainButtonPressed(event: MouseEvent) {
@@ -76,14 +72,18 @@ export class CoreEditor {
     return this.tool;
   }
 
-  public mode: BaseMode = new FlexMode();
+  public mode: BaseMode;
   public sequenceTypeEnterMode = SequenceType.RNA;
   private micromoleculesEditor: Editor;
   private hotKeyEventHandler: (event: unknown) => void = () => {};
+  private copyEventHandler: (event: ClipboardEvent) => void = () => {};
+  private pasteEventHandler: (event: ClipboardEvent) => void = () => {};
+  private keydownEventHandler: (event: KeyboardEvent) => void = () => {};
 
-  constructor({ theme, canvas }: ICoreEditorConstructorParams) {
+  constructor({ theme, canvas, mode }: ICoreEditorConstructorParams) {
     this.theme = theme;
     this.canvas = canvas;
+    this.mode = mode ?? new SequenceMode();
     resetEditorEvents();
     this.events = editorEvents;
     this.setMonomersLibrary(monomersDataRaw);
@@ -102,6 +102,7 @@ export class CoreEditor {
     const ketcher = ketcherProvider.getKetcher();
     this.micromoleculesEditor = ketcher?.editor;
     this.switchToMacromolecules();
+    this.rerenderSequenceMode();
   }
 
   static provideEditorInstance(): CoreEditor {
@@ -161,18 +162,22 @@ export class CoreEditor {
 
   private setupKeyboardEvents() {
     this.setupHotKeysEvents();
-    document.addEventListener('keydown', async (event: KeyboardEvent) => {
+    this.keydownEventHandler = async (event: KeyboardEvent) => {
       await this.mode.onKeyDown(event);
-    });
+    };
+
+    document.addEventListener('keydown', this.keydownEventHandler);
   }
 
   private setupCopyPasteEvent() {
-    document.addEventListener('copy', (event: ClipboardEvent) => {
+    this.copyEventHandler = (event: ClipboardEvent) => {
       this.mode.onCopy(event);
-    });
-    document.addEventListener('paste', (event: ClipboardEvent) => {
+    };
+    this.pasteEventHandler = (event: ClipboardEvent) => {
       this.mode.onPaste(event);
-    });
+    };
+    document.addEventListener('copy', this.copyEventHandler);
+    document.addEventListener('paste', this.pasteEventHandler);
   }
 
   private setupHotKeysEvents() {
@@ -380,6 +385,9 @@ export class CoreEditor {
       this.events[eventName].handlers = [];
     }
     document.removeEventListener('keydown', this.hotKeyEventHandler);
+    document.removeEventListener('copy', this.copyEventHandler);
+    document.removeEventListener('paste', this.pasteEventHandler);
+    document.removeEventListener('keydown', this.keydownEventHandler);
   }
 
   get trackedDomEvents() {
@@ -543,5 +551,18 @@ export class CoreEditor {
       );
     this.renderersContainer.update(modelChanges);
     ketcher?.editor.clear();
+  }
+
+  private rerenderSequenceMode() {
+    if (this.mode instanceof SequenceMode) {
+      const modelChanges = this.drawingEntitiesManager.reArrangeChains(
+        this.canvas.width.baseVal.value,
+        true,
+        false,
+      );
+      this.drawingEntitiesManager.clearCanvas();
+      this.renderersContainer.update(modelChanges);
+      this.drawingEntitiesManager.applyMonomersSequenceLayout();
+    }
   }
 }
